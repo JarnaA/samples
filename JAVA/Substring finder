@@ -1,0 +1,167 @@
+/*
+ * Program finds substrings from user input. 
+ * Sorry about the finnish comments and names, this was my homework :) 
+ * 
+ */
+
+import java.util.Scanner;
+
+public class SubstringFinder {
+
+    public static void main(String[] args) {
+        /* luodaan toiminnallisuus, joka tervehtii käyttäjää
+        * ja kysyy käyttäjältä merkkijonon sekä etsittävän
+        * merkkijonon ja ilmoittaa mahdollisesta virheestä
+		*/
+		
+		// main-method collects string, substring to be found and
+		// gives warning if an error occurs
+        
+        Scanner lukija = new Scanner(System.in);
+        System.out.println("Hello! I find substrings.");
+        
+        final String VIRHE = "Error!";
+        final char STAR = '*';
+        final String YES = "y";
+        final String NO = "n";
+        
+        boolean uusiKierros = true;
+        while (uusiKierros) {
+            // silmukka, joka antaa käyttäjän jatkaa merkkijonojen etsimistä
+            System.out.println("Please, enter a string:");
+            String merkkijono = lukija.nextLine();
+            String haettava = "";
+            
+            boolean jatketaan = true;            
+            while (jatketaan) {
+                // silmukka, joka kysyy käyttäjältä etsittävää merkkijonoa
+                // kunnes annettu merkkijono täyttää vaatimukset
+                System.out.println("Please, enter a substring:");
+                haettava = lukija.nextLine();
+                if (haettava.length() > merkkijono.length()) {
+                    System.out.println(VIRHE);
+                } else if (haettava.charAt(0) == STAR 
+                        && haettava.charAt(haettava.length() - 1) == STAR) {
+                    System.out.println(VIRHE);
+                } else {
+                    jatketaan = false;
+                }
+            }
+
+            // kutsutaan metodia, joka vertailee merkkijonoja
+            substringFinder(merkkijono, haettava);
+
+            // kysytään haluaako käyttäjä jatkaa merkkijonoilla leikkimistä
+            // ja jos ei halua, lopetetaan ohjelma
+            boolean lopetus = true;
+            while (lopetus) {
+                // silmukka lukee käyttäjältä syötteitä, kunnes saa hyväksytyn syötteen
+                System.out.println("Continue (y/n)?");
+                String jatko = lukija.nextLine();
+                
+                if (!jatko.equals(YES) && !jatko.equals(NO)) {
+                    System.out.println(VIRHE);
+                } 
+                else if (jatko.equals(NO)) {
+                    System.out.println("See you soon.");
+                    lopetus = false;
+                    uusiKierros = false;
+                } else {
+                    lopetus = false;
+                }
+            }
+        }
+    }
+    
+    
+    public static void printFindings(String haettava, int kuinkaMontaTyhjaaAlkuun, int merkkijononPituus) {
+        // metodi tulostaa saamiensa parametrien mukaan löytyneet osamerkkijonoesiintymät
+		// method prints out all substrings found from original string
+		
+        if (haettava.length() + kuinkaMontaTyhjaaAlkuun <= merkkijononPituus) { 
+            int i = 1;
+            final char TYHJA = '-'; 
+            while (i <= merkkijononPituus) {
+                while (i <= kuinkaMontaTyhjaaAlkuun) {
+                    System.out.print(TYHJA);
+                    i++;
+                }
+                System.out.print(haettava);
+                i = i + haettava.length();
+                while (i <= merkkijononPituus) {
+                    System.out.print(TYHJA);
+                    i++;
+                }
+            }  
+            System.out.println("");
+        }
+    }
+    
+    public static void substringFinder(String merkkijono, String osamerkkijono) {
+        // metodi etsii haettavaa merkkijonoa ensin annetusta merkkijonosta
+        // method finds substring from orginal string
+		
+        String haettava = osamerkkijono;
+        int apulainen = 0;  // muuttuja, joka pitää muistissa ensimmäisen osuman paikan
+        int kohtaH = 0;     // osamerkkijonon tarkastelun aloituskohta
+        int kohtaM = 0;     // merkkijonon tarkatelun aloituskohta
+        final char STAR = '*';
+        boolean jatketaankoSeuraavaanMerkkiin = true;
+
+        // testataan onko osamerkkijonossa mukana haun alkuun tai loppuun pakottavaa
+        // asteriskia ja trimmataan se tarvittaessa pois ennen haun aloittamista
+		// user can force the searching start from the end (* is first char of the substring)
+		// or to the end (* is the last char of the substring)
+        if (osamerkkijono.charAt(0) == STAR) {
+            // haku pakotetaan loppuun
+            int i = 1;
+            haettava = "";
+            // nollattaan haettava osamerkkijono ja rakennetaan se ilman asteriskia
+            while (i < osamerkkijono.length()) {
+                haettava = haettava + osamerkkijono.charAt(i);
+                i++;
+            }   
+            kohtaM = merkkijono.length() - haettava.length();
+        }
+        if (osamerkkijono.charAt(osamerkkijono.length() - 1) == STAR) {
+            // haku pakotetaan alkuun
+            int j = 0;
+            haettava = "";
+            // nollataan haettava osamerkkijono ja rakennetaan se ilman asteriskia
+            while (j < osamerkkijono.length() - 1) {
+                haettava = haettava + osamerkkijono.charAt(j);
+                j++;
+            }
+            jatketaankoSeuraavaanMerkkiin = false;
+        }
+
+        do {
+            // aloitetaan osamerkkijonon etsiminen merkkijonosta
+            boolean kaikkiMerkitOikein = true;
+            if (haettava.charAt(kohtaH) == merkkijono.charAt(kohtaM)) {
+                apulainen = kohtaM;
+                int kohtaH2 = kohtaH + 1;   // osamerkkijonon testausta jatketaan seuraavasta indeksistä
+                int kohtaM2 = kohtaM + 1;   // merkkijonon testausta jatketaan seuraavasta indeksistä
+
+                while (kohtaH2 <= haettava.length() - 1 && kaikkiMerkitOikein && kohtaM2 <= merkkijono.length() - 1) {
+                    // osamerkkijonon ensimmäistä merkkiä vastaava merkki merkkijonosta on löytynyt, testataan ovatko
+                    // merkkijonon seuraavat merkit samat kuin osamerkkijonon merkit
+                    if (haettava.charAt(kohtaH2) == merkkijono.charAt(kohtaM2)) {
+                        kohtaH2++;
+                        kohtaM2++; 
+                    } else {
+                        kaikkiMerkitOikein = false;
+                    }
+                }    
+
+                if (kaikkiMerkitOikein) { 
+                    // pyydetään tulostamaan osamerkkijonon löytyminen merkkijonosta
+                    printFindings(haettava, apulainen, merkkijono.length());                    
+                }
+            } 
+            kohtaM++;
+        } while (kohtaM < merkkijono.length() && jatketaankoSeuraavaanMerkkiin);
+    }
+}
+
+
