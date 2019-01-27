@@ -1,0 +1,464 @@
+/*
+ * Program uses averaging filter to modify ASCII-pictures.
+ * Note! Uses only limited chars!
+ * Sorry about the finnish comments and names, this was my homework :)
+ */
+ 
+import java.io.*;
+import java.util.*;
+ 
+public class LakiHT2 {
+    
+    /* Tervehditään käyttäjää ja annetaan toimintaohjeita.
+	* Say hello to user, introduce usabel commands and load
+	* ASCII-picture from .txt-file.
+    */
+    public static void main (String[] args) {
+        
+        // aloitetaan tervehdyksellä
+        System.out.println("-------------------");
+        System.out.println("| A S C I I A r t |");
+        System.out.println("-------------------");
+                
+        // komentoriviparametrin käsittely
+        if (args.length == 1) {
+            String tiedostonNimi = args[0];
+        
+            boolean tarvitaanResetointi = false;
+            do {
+                // kutsutaan tekstitiedoston taulukoksi muuttavaa operaatiota
+                // ja otetaan sen palauttama taulukko talteen      
+                char[][] merkkiTaulukko = loadToArray(tiedostonNimi);
+        
+                // luodaan samalla jo valmiiksi merkkien perusteella kokonaislukutaulukko
+                int[][] lukuTaulukko = null;
+        
+                // tarkistetaan onnistuiko tiedoston lataaminen taulukoksi
+                if (merkkiTaulukko == null) {
+                    System.out.println("Invalid command-line argument!");
+                } else {
+                    // täytetään lukutaulukko alkuperäisillä tiedoilla
+                    lukuTaulukko = charactersToIntegers(merkkiTaulukko);
+            
+                    // silmukka, jossa käyttäjä toimii kunnes valitsee lopetuksen
+                    boolean jatketaanko = true;
+                    do {                
+                        // toimintovaihtoehdot käyttäjälle
+                        System.out.println("printa/printi/info/filter [n]/reset/quit?");
+                        String komento = In.readString();
+                
+                        // tarkistetaan mitä annettu komento vastaa ja suoritetaan komento
+                        if (komento.equals("quit")) {
+                            jatketaanko = false;
+                            tarvitaanResetointi = false;
+                    
+                        } else if (komento.startsWith("filter")) {
+                            // jos suotimen pituutta ei ole annettu, määritellään se kolmeksi, 
+                            // muussa tapauksessa selvitetään annettu pituus
+                            if (komento.length() <= 7) {
+                                lukuTaulukko = keskiarvosuodatus(lukuTaulukko, 3);
+                                if (lukuTaulukko != null) {
+                                    merkkiTaulukko = integersToCharacters(lukuTaulukko);
+                                }
+                            } else {
+                                int pituus = kerroSuotimenPituus(komento);
+                                lukuTaulukko = keskiarvosuodatus(lukuTaulukko, pituus);
+                                if (lukuTaulukko != null) {
+                                    merkkiTaulukko = integersToCharacters(lukuTaulukko);
+                                }
+                            }
+                        } else if (komento.equals("printa")) {
+                            // tulostetaan merkkitaulukko
+                            print2DCharacterArray(merkkiTaulukko);
+                
+                        } else if (komento.equals("printi")) { 
+                            // tulostetaan lukutaulukko
+                            print2DIntegerArray(lukuTaulukko);
+                    
+                        } else if (komento.equals("info")) {
+                            // tulostetaan kuvatiedoston frekvenssit
+                            laskeTiedot(merkkiTaulukko);
+                    
+                        } else if (komento.equals("reset")) {
+                            // aloitetaan uudestaan tiedoston lataamisesta asti
+                            jatketaanko = false;
+                            tarvitaanResetointi = true;
+                        } 
+                            
+                    } while (jatketaanko);
+                } 
+            } while (tarvitaanResetointi);
+        } else {
+            System.out.println("Invalid command-line argument!");
+        }
+        
+        // lopuksi sanotaan heipat käyttäjälle
+        System.out.println("Bye, see you soon.");
+            
+    }
+    
+	
+    /* Ladataan käyttäjän antama tiedosto, selvitetään tuotettavan taulukon koko
+    * ja luodaan uusi taulukko tiedoston riveistä.
+	* Loading the text file, find out table size and creating new table
+	* from text lines. 
+    */
+    public static char[][] loadToArray(String tiedostonNimi) {
+        char[][] taulukko = null; 
+      
+        // luetaan annettu tiedsto ja kutsutaan sen rivimäärän selvittävää operaatiota
+        try {
+            File tiedosto = new File(tiedostonNimi);    
+            Scanner rivinlukija = new Scanner(tiedosto);
+         
+            // selvitetään tiedoston rivien koko taulukon rivimäärää varten
+            int[] taulukonKoko = countLines(tiedostonNimi);
+         
+            if (taulukonKoko != null) {
+                // otetaan talteen uuden taulukon kokotiedot ja luodaan sopivan kokoinen taulukko
+                int rivit = taulukonKoko[0];
+                int sarakkeet = taulukonKoko[1];
+                taulukko = new char[rivit][sarakkeet];
+                int rivi = 0;
+         
+                // luetaan tiedosto rivi kerrallaan ja täytetään uusi taulukko 
+                // tiedostosta saatavilla merkeillä
+                while (rivinlukija.hasNextLine()) {
+                    String luettuRivi = rivinlukija.nextLine();
+                    int sarake = 0;
+                    while (sarake < sarakkeet) {
+                        taulukko[rivi][sarake] = luettuRivi.charAt(sarake);
+                        sarake++;
+                    }
+                    rivi++;
+                }
+            }   
+            rivinlukija.close();
+        } 
+        // napataan mahdollinen lukuvirhe tiedostosta kiinni
+        catch (Exception e) {
+            taulukko = null;
+        }
+      
+        return taulukko; 
+    }   
+    
+    /* Luetaan parametrina saatu tiedosto ja lasketaan sen rivien ja sarakkeiden
+    * lukumäärä. Palautetaan tieto kutsuvalle metodille.
+	* Reading text file, count lines and chars per line, return
+	* these numbers.
+    */
+    public static int[] countLines(String tiedostonNimi) {
+        int[] palautettava = null;
+        int rivit = 0;
+        int sarakkeet = 0;
+        
+        // luetaan saatu tiedosto Scanner-olion avulla ja lasketaan 
+        // tiedoston sisältämien rivien määrä
+        try {
+            File tiedosto = new File(tiedostonNimi);         
+            Scanner lukija = new Scanner(tiedosto);
+            
+            while (lukija.hasNextLine()) {
+                rivit++;
+                String rivi = lukija.nextLine();
+                // tutkitaan sarakkeiden määrä yhden rivin merkkimäärästä
+                sarakkeet = rivi.length();
+            }
+            lukija.close();
+            
+        // luodaan saatujen tietojen perusteella taulukko, jossa tiedot palautetaan 
+        // kutsuneelle metodille
+        palautettava = new int[] {rivit, sarakkeet};
+        } 
+        // napataan mahdollinen tiedostonlukuvirhe kiinni
+        catch (Exception e) {
+            palautettava = null;
+        }
+        return palautettava;
+    }
+    
+    
+
+    /* Operaatio muuttaa saamansa merkkitaulukon alkiot kokonaisluvuiksi 
+    * luoden niistä uuden taulukon ja palauttaa sen.
+    */
+    public static int[][] charactersToIntegers(char[][] taulukkoMerkit) {       
+        int [][] taulukkoLuvut = null; 
+        
+        // tarkistetaan parametrinä saadun taulukon oikeellisuus ja luodaan 
+        // sopivan kokoinen taulukko kokonaisluvuille
+        if (taulukkoMerkit != null) {               
+            if (taulukkoMerkit.length > 0 && taulukkoMerkit[0].length > 0) {
+                int rivit = taulukkoMerkit.length;
+                int sarakkeet = taulukkoMerkit[0].length;
+                taulukkoLuvut = new int[rivit][sarakkeet];
+
+                // täytetäään kokonaislukutaulukko merkkejä vastaavilla kokonaisluvuilla
+                for (int i = 0; i < taulukkoMerkit.length; i++) {
+                    for (int j = 0; j < taulukkoMerkit[0].length; j++) {
+                        int luku = convertToInteger(taulukkoMerkit[i][j]);
+                        if (luku > -1) {
+                            taulukkoLuvut[i][j] = luku;
+                        } 
+                    }
+                }
+            }
+        }
+        // palautetaan täytetty kokonaislukutaulukko
+        return taulukkoLuvut;
+    }       
+    
+    /* Operaatio muuttaa merkkitaulukon lukutaulukoksi.
+    */
+    public static char[][] integersToCharacters(int[][] taulukkoLuvut) {        
+        char[][] taulukkoMerkit = null; 
+        
+        // tarkistetaan parametrinä saadun taulukon oikeellisuus ja luodaan 
+        // sopivan kokoinen taulukko kokonaisluvuille
+        if (taulukkoLuvut != null) {                
+            if (taulukkoLuvut.length > 0 && taulukkoLuvut[0].length > 0) {
+                int rivit = taulukkoLuvut.length;
+                int sarakkeet = taulukkoLuvut[0].length;
+                taulukkoMerkit = new char[rivit][sarakkeet];
+
+                // täytetäään kokonaislukutaulukko merkkejä vastaavilla kokonaisluvuilla
+                for (int i = 0; i < taulukkoLuvut.length; i++) {
+                    for (int j = 0; j < taulukkoLuvut[0].length; j++) {
+                        char merkki = convertToCharacter(taulukkoLuvut[i][j]);
+                        if (merkki != Character.MAX_VALUE) {
+                            taulukkoMerkit[i][j] = merkki;
+                        } 
+                    }
+                }
+            }
+        }
+        // palautetaan täytetty kokonaislukutaulukko
+        return taulukkoMerkit;
+    }
+    
+    /* Operaatio kääntää annetun merkin kokonaisluvuksi ja palauttaa
+    * sen kutsuneelle operaatiolle.
+    */  
+    public static int convertToInteger(char merkki) {
+        int palautettava = -1;
+        char[] taulukko = {'#', '@', '&', '$', '%', 'x', '*', 'o', '|', '!',
+            ';', ':', '\'', ',', '.', ' '};
+            
+        // etsitään oikea merkki taulukosta ja otetaan talteen sen indeksi palauttamista varten
+        int indeksi = 0;
+        boolean hukassa = true;
+        while (hukassa && indeksi < taulukko.length) { 
+            if (merkki == taulukko[indeksi]) {
+                palautettava = indeksi;
+                hukassa = false;
+            } 
+            indeksi++;
+        }
+        
+        // palautetaan kokonaisluku 
+        return palautettava;
+    }   
+    
+    /* Operaatio muuttaa saamansa kokonaisluvun merkiksi.
+    */
+    public static char convertToCharacter(int indeksi) {
+        char[] taulukko = {'#', '@', '&', '$', '%', 'x', '*', 'o', '|', '!',
+            ';', ':', '\'', ',', '.', ' '};
+        if (indeksi < 0 || indeksi > 15) {
+            return Character.MAX_VALUE;
+        } else {
+            char palautettava = taulukko[indeksi];
+            return palautettava;
+        }
+    }
+    
+    
+
+    /* Operaatio kerää ja tulostaa merkkitaulukon tiedot.
+	* Collect and print info about table; how many rows, chars...
+    */
+    public static void laskeTiedot(char[][] taulukko) {
+        
+        // aloitetaan tarkistamalla onko taulukolle annettu sisältöä
+        if (taulukko != null) {
+            // lasketaan ensin taulukon rivit ja sarakkeet
+            int rivit = taulukko.length;
+            int sarakkeet = taulukko[0].length;
+            System.out.println(rivit + " x " + sarakkeet);
+        
+            // selvitetään sitten taulukossa esiintyvien merkkien lukumäärät
+            int[] luvutTaulukossa = frequencyCounter(taulukko);
+        
+            // tulostetaan esiintymien määrä 
+            int i = 0;
+            while (i < luvutTaulukossa.length) {
+                System.out.println(convertToCharacter(i) + " " + luvutTaulukossa[i]);
+                i++;
+            }
+        }
+    }
+    
+    /* Operaatio laskee yksiuloitteisen taulukon alkioiden esiintymät
+    kaksiulotteisessa taulukossa ja palauttaa tiedon kutsuneelle metodille. 
+    */
+    public static int[] frequencyCounter(char[][] taulukko2) {
+        // luodaan palautettava taulukko
+        char[] taulukko1 = {'#', '@', '&', '$', '%', 'x', '*', 'o', '|', '!',
+            ';', ':', '\'', ',', '.', ' '};
+        int [] esiintymat = null;
+        
+        if (taulukko1 != null && taulukko2 != null) {
+            esiintymat = new int[taulukko1.length];
+            int i = 0;
+            while (i < taulukko1.length) {
+                int maara = 0;
+
+                // tutkitaan kuinka moni yksiulotteisen taulukon merkeistä 
+                // esiintyy kaksiuloitteisessa taulukossa
+                for (int j = 0; j < taulukko2.length; j++) {   
+                    for (int k = 0; k < taulukko2[0].length; k++) {
+                        if (taulukko1[i] == taulukko2[j][k]) {
+                            maara++;
+                        }
+                    }
+                }
+                // tallennetaan löydetyt määrät uuteen taulukkoon
+                esiintymat[i] = maara;
+                i++;
+            }
+        }
+        // palautetaan esiintymät tallettanut taulukko alkuperäiselle metodille
+        return esiintymat;
+    }
+    
+    
+
+    /* Operaatio tulostaa kaksiulotteisen taulukon annetulla sarkainleveydellä.
+	* Prints 2D-table with certain spacing between integers. 
+    */
+    public static void print2DIntegerArray(int[][] taulukko) {
+        // tarkastetaan onko taulukolle varattu muistia ja jos on, 
+        // tulostetaan taulukon sisältö
+        int tyhjat = 0;
+        final int LEVEYS = 2;
+        if (taulukko != null && LEVEYS > 0) {
+            for (int i = 0; i < taulukko.length; i++) {   
+                int j = 0;
+                while (j < taulukko[i].length) {
+                    
+                    // tarkistetaan ensin onko tulostettava alkio rivin ensimmäinen
+                    // ja jos ei, tulostetaan sen eteen sarakkeita erottava välilyönti
+                    if (j >= 1) {
+                        System.out.print(" ");
+                    } 
+                    // tarkistetaan mikä on taulukon solussa olevan luvun leveys 
+                    // ja tulostetaan sopiva määrä välilyöntejä ennen lukua
+                    String luku = String.valueOf(taulukko[i][j]);
+                    int luvunLeveys = luku.length();
+                    tyhjat = LEVEYS - luvunLeveys;
+                    int k = 0;
+                    while (k < tyhjat) {
+                        System.out.print(" ");
+                        k++;
+                    }
+                    System.out.print(taulukko[i][j]);
+                    j++;
+                }
+                System.out.println("");
+            }
+        }
+    }
+    
+    /* Operaatio tulostaa saamansa merkkitaulukon.
+    */
+    public static void print2DCharacterArray(char[][] taulukko) {
+        // tarkastetaan onko taulukolle varattu muistia ja jos on, 
+        // tulostetaan taulukon sisältö
+        if (taulukko != null) {
+            for (int i = 0; i < taulukko.length; i++) {   
+                for (int j = 0; j < taulukko[i].length; j++) {
+                    System.out.print(taulukko[i][j]);
+                }
+                System.out.println("");
+            }
+        }
+    }
+    
+    
+
+    /* Operaatio selvittää parametrina saamansa filter-komennon sisällöstä 
+    * keskiarvosuotimen sivun pituuden.
+	* Defines length of side of averaging filter.
+    */
+    public static int kerroSuotimenPituus(String merkkijono) {
+        String[] osat = merkkijono.split("[ ]");
+        int pituus = Integer.parseInt(osat[1]);
+        return pituus;
+    }
+    
+    /* Operaatio tuottaa uuden keskiarvosuotimella käsitellyn lukutaulukon,
+    * josta muokattu kuva muodostetaan.
+	* Produces new int array when averaging filter is used. 
+    */
+    public static int[][] keskiarvosuodatus(int[][] taulukko, int suotimenPituus) {
+        int[][] uusiTaulukko = null; 
+        int reunanLeveys = suotimenPituus / 2;
+        
+        // tarkistetaan onko annetulle taulukolle varattu muistia
+        if (taulukko != null && taulukko.length > 0 && taulukko[0].length > 0 ) {
+            uusiTaulukko = new int[taulukko.length][taulukko[0].length];
+            
+            // käydään läpi taulukko alkio alkiolta ja pyydetään uusi arvo niille alkioille, joiden kohdalla
+            // keskiarvosuodin mahtuu kokonaan kuvan päälle
+            for (int y = 0; y < taulukko.length; y++) {
+                for (int x = 0; x < taulukko[0].length; x++) {
+                    if (y < reunanLeveys || x < reunanLeveys ||  y + reunanLeveys > taulukko.length -1 
+                        || x + reunanLeveys > taulukko[0].length - 1) {   
+                        // suodatin ei mahdu kokonaan kuvan päälle, joten kopioidaan alkion arvo                    
+                        uusiTaulukko[y][x] = taulukko[y][x];
+                    } else {
+                        // suodatin mahtuu kuvan päälle, joten lasketaan alkioiden keskiarvosta uusi arvo
+                        uusiTaulukko[y][x] = suodataUusiLuku(taulukko, suotimenPituus, x, y);
+                    }
+                }
+            }
+        }
+        
+        return uusiTaulukko;
+    }   
+        
+    /* Operaatio toimii keskiarvosuotimena antaen uuden luvun tallennettavaksi
+    * kokonaislukutaulukkoon.
+	* Calculates new numbers by average. Filters length is defined = reunanPituus.
+    */
+    public static int suodataUusiLuku(int[][] taulukko, int reunanPituus, int x, int y) {
+        
+        int palautettava = -1;
+        int reunanLeveys = reunanPituus / 2;
+        int vasenAlku = x - reunanLeveys;
+        final int OIKEALOPPU = x + reunanLeveys;
+        int ylinRivi = y - reunanLeveys;
+        final int ALINRIVI = y + reunanLeveys;
+        final int JAKAJA = reunanPituus * reunanPituus;
+        double summa = 0;
+        
+        // käydään läpi taulukon arvot kysytyn pisteen ympäriltä ja lasketaan niiden yhteissumma
+        if (taulukko != null) {         
+            for (int i = ylinRivi; i <= ALINRIVI; i++) {
+                for (int j = vasenAlku; j <= OIKEALOPPU; j++) {
+                    summa = summa + taulukko[i][j];
+                }
+            }
+        }
+
+        // jaetaan summa alkioiden määrällä, pyöristetään ja palautetaan kutsuneelle operaatiolle
+        summa = summa / JAKAJA;
+        palautettava = (int)(Math.round(summa));
+        
+        return palautettava;
+        
+    }
+        
+    
+}
